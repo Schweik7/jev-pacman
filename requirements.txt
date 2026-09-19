@@ -1,0 +1,4 @@
+numpy
+pillow
+# 拿到 Jev 资格后：
+# typesafe-sdk
