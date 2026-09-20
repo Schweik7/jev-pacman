@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from urllib.parse import urlsplit
 from types import SimpleNamespace
 
+from ..dotenv import load_dotenv
+
 HOST = "openrouter.ai"
 PATH = "/api/alpha/decisions"
 DEFAULT_MODEL = "~typesafe/jev-latest"
@@ -31,9 +33,11 @@ class Choice:
 
 class OpenRouterJevClient:
     def __init__(self, api_key=None, model=DEFAULT_MODEL, timeout=10.0):
+        if not api_key and not os.environ.get("OPENROUTER_API_KEY"):
+            load_dotenv()
         self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY")
         if not self.api_key:
-            raise SystemExit("缺少 OPENROUTER_API_KEY 环境变量")
+            raise SystemExit("缺少 OPENROUTER_API_KEY：设成环境变量，或写进项目根目录的 .env")
         self.model = model
         self.timeout = timeout
         self._conn = None

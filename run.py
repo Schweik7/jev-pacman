@@ -13,9 +13,12 @@ import statistics
 
 from jev_pacman import PacmanConfig, PacmanEnv, run_realtime, run_turn_based
 from jev_pacman.agents import make_agent
+from jev_pacman.dotenv import load_dotenv
+from jev_pacman.viewer import Tee
 
 
 def main():
+    load_dotenv()  # 项目根目录的 .env（OPENROUTER_API_KEY / TYPESAFE_API_KEY）
     p = argparse.ArgumentParser(description="Jev 吃豆人环境")
     p.add_argument("--agent", default="greedy", choices=["random", "greedy", "mockjev", "jev", "jev-openrouter"])
     p.add_argument("--mode", default="turn", choices=["turn", "realtime"])
@@ -27,6 +30,8 @@ def main():
     p.add_argument("--max-ticks", type=int, default=3000)
     p.add_argument("--mock-latency", default="70,500", help="模拟 Jev 的延迟范围（毫秒），如 70,500")
     p.add_argument("--no-map", action="store_true", help="不把 ASCII 地图发给模型，减少输入")
+    p.add_argument("--watch", action="store_true", help="在终端里实时观看对局")
+    p.add_argument("--watch-ms", type=int, default=60, help="终端画面的最小刷新间隔（毫秒）")
     p.add_argument("--gif", help="把第一局录成 GIF")
     p.add_argument("--gif-every", type=int, default=1, help="每隔几个 tick 录一帧")
     p.add_argument("--json", help="把结果写入 JSON 文件")
@@ -40,22 +45,31 @@ def main():
     results = []
     try:
         for ep in range(args.episodes):
-            recorder = None
+            gif = None
             if args.gif and ep == 0:
                 from jev_pacman.render import GifRecorder
-                recorder = GifRecorder(every=args.gif_every)
+                gif = GifRecorder(every=args.gif_every)
+            viewer = None
+            if args.watch:
+                from jev_pacman.viewer import TerminalViewer
+                viewer = TerminalViewer(min_frame_ms=args.watch_ms)
+            recorder = gif if viewer is None else Tee(viewer, gif)
             seed = args.seed + ep
-            if args.mode == "turn":
-                res = run_turn_based(env, agent, seed=seed, recorder=recorder)
-            else:
-                res = run_realtime(env, agent, tick_ms=args.tick_ms, seed=seed, recorder=recorder)
+            try:
+                if args.mode == "turn":
+                    res = run_turn_based(env, agent, seed=seed, recorder=recorder)
+                else:
+                    res = run_realtime(env, agent, tick_ms=args.tick_ms, seed=seed, recorder=recorder)
+            finally:
+                if viewer:
+                    viewer.close()
             res["episode"] = ep
             results.append(res)
             print(json.dumps(res, ensure_ascii=False))
-            if recorder:
+            if gif:
                 frame_ms = args.tick_ms * args.gif_every if args.mode == "realtime" else 80 * args.gif_every
-                recorder.save(args.gif, frame_ms=frame_ms)
-                print(f"GIF 已保存: {args.gif}（{len(recorder.frames)} 帧）")
+                gif.save(args.gif, frame_ms=frame_ms)
+                print(f"GIF 已保存: {args.gif}（{len(gif.frames)} 帧）")
     finally:
         close = getattr(agent, "close", None)
         if callable(close):
