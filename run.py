@@ -34,6 +34,7 @@ def main():
     p.add_argument("--watch-ms", type=int, default=60, help="终端画面的最小刷新间隔（毫秒）")
     p.add_argument("--gif", help="把第一局录成 GIF")
     p.add_argument("--gif-every", type=int, default=1, help="每隔几个 tick 录一帧")
+    p.add_argument("--gif-ms", type=int, help="GIF 每帧的毫秒数（默认按真实节奏；调小就是加速播放）")
     p.add_argument("--json", help="把结果写入 JSON 文件")
     args = p.parse_args()
 
@@ -67,7 +68,8 @@ def main():
             results.append(res)
             print(json.dumps(res, ensure_ascii=False))
             if gif:
-                frame_ms = args.tick_ms * args.gif_every if args.mode == "realtime" else 80 * args.gif_every
+                frame_ms = args.gif_ms or (args.tick_ms * args.gif_every if args.mode == "realtime"
+                                           else 80 * args.gif_every)
                 gif.save(args.gif, frame_ms=frame_ms)
                 print(f"GIF 已保存: {args.gif}（{len(gif.frames)} 帧）")
     finally:
